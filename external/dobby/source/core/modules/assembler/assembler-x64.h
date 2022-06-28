@@ -86,7 +86,7 @@ private:
 
 class RelocLabelEntry : public PseudoLabel {
 public:
-  explicit RelocLabelEntry(uint64_t data) : data_size_(0) {
+  explicit RelocLabelEntry(uint64_t data) {
     data_ = data;
   }
 
@@ -96,8 +96,6 @@ public:
 
 private:
   uint64_t data_;
-
-  int data_size_;
 };
 
 #define ModRM_Mod(byte) ((byte & 0b11000000) >> 6)

@@ -126,7 +126,7 @@ void GenRelocateCodeAndBranch(void *buffer, AssemblyCodeChunk *origin, AssemblyC
 #define _ turbo_assembler_.
 
   uint64_t curr_orig_pc = origin->raw_instruction_start();
-  uint64_t curr_relo_pc = relocated->raw_instruction_start();
+  [[maybe_unused]] uint64_t curr_relo_pc = relocated->raw_instruction_start();
 
   addr_t buffer_cursor = (addr_t)buffer;
   arm64_inst_t instr = *(arm64_inst_t *)buffer_cursor;
@@ -134,7 +134,7 @@ void GenRelocateCodeAndBranch(void *buffer, AssemblyCodeChunk *origin, AssemblyC
   int predefined_relocate_size = origin->raw_instruction_size();
 
   while (buffer_cursor < ((addr_t)buffer + predefined_relocate_size)) {
-    int last_relo_offset = turbo_assembler_.GetCodeBuffer()->getSize();
+    [[maybe_unused]] int last_relo_offset = turbo_assembler_.GetCodeBuffer()->getSize();
 
     if ((instr & LoadRegLiteralFixedMask) == LoadRegLiteralFixed) { // ldr x0, #16
       int rt = decode_rt(instr);

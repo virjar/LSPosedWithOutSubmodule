@@ -12,6 +12,8 @@ public:
   }
 
 public:
+  virtual ~CodeBufferBase() = default;
+
   virtual CodeBufferBase *Copy();
 
   void Emit8(uint8_t data);

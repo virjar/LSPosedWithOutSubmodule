@@ -115,7 +115,7 @@ private:
 
 class RelocLabelEntry : public PseudoLabel {
 public:
-  explicit RelocLabelEntry(uint64_t data) : data_size_(0) {
+  explicit RelocLabelEntry(uint64_t data) {
     data_ = data;
   }
 
@@ -125,8 +125,6 @@ public:
 
 private:
   uint64_t data_;
-
-  int data_size_;
 };
 
 // ================================================================
@@ -193,18 +191,18 @@ private:
 class MemOperand {
 public:
   inline explicit MemOperand(Register base, int64_t offset = 0, AddrMode addrmode = Offset)
-      : base_(base), regoffset_(InvalidRegister), offset_(offset), addrmode_(addrmode), shift_(NO_SHIFT),
-        extend_(NO_EXTEND), shift_extend_imm_(0) {
+      : base_(base), regoffset_(InvalidRegister), offset_(offset), shift_(NO_SHIFT),
+        extend_(NO_EXTEND), shift_extend_imm_(0), addrmode_(addrmode) {
   }
 
   inline explicit MemOperand(Register base, Register regoffset, Extend extend, unsigned extend_imm)
-      : base_(base), regoffset_(regoffset), offset_(0), addrmode_(Offset), shift_(NO_SHIFT), extend_(extend),
-        shift_extend_imm_(extend_imm) {
+      : base_(base), regoffset_(regoffset), offset_(0), shift_(NO_SHIFT), extend_(extend),
+        shift_extend_imm_(extend_imm), addrmode_(Offset) {
   }
 
   inline explicit MemOperand(Register base, Register regoffset, Shift shift = LSL, unsigned shift_imm = 0)
-      : base_(base), regoffset_(regoffset), offset_(0), addrmode_(Offset), shift_(shift), extend_(NO_EXTEND),
-        shift_extend_imm_(shift_imm) {
+      : base_(base), regoffset_(regoffset), offset_(0), shift_(shift), extend_(NO_EXTEND),
+        shift_extend_imm_(shift_imm), addrmode_(Offset) {
   }
 
   inline explicit MemOperand(Register base, const Operand &offset, AddrMode addrmode = Offset)
@@ -317,10 +315,10 @@ public:
   // LogicalImmeidate
   static int32_t EncodeLogicalImmediate(const Register &rd, const Register &rn, const Operand &operand) {
     int64_t imm = operand.Immediate();
-    int32_t N, imms, immr;
+    int32_t imms, immr;
     immr = bits(imm, 0, 5);
     imms = bits(imm, 6, 11);
-    N = bit(imm, 12);
+    [[maybe_unused]] int32_t N = bit(imm, 12);
 
     return (sf(rd) | LeftShift(immr, 6, 16) | LeftShift(imms, 6, 10) | Rd(rd) | Rn(rn));
   }

@@ -15,7 +15,7 @@ protected:
 public:
   explicit LiteMutableArray(int count);
 
-  ~LiteMutableArray();
+  virtual ~LiteMutableArray();
 
   // === LiteObject override ==
   void release() override;

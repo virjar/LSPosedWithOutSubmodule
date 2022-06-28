@@ -31,7 +31,7 @@ public:
     kInvalid
   };
 
-  constexpr CPURegister(int code, int size, RegisterType type) : RegisterBase(code), reg_size_(size), reg_type_(type) {
+  constexpr CPURegister(int code, int size, RegisterType type) : RegisterBase(code), reg_type_(type), reg_size_(size) {
   }
 
   static constexpr CPURegister Create(int code, int size, RegisterType type) {
@@ -57,6 +57,8 @@ public:
   }
 
   // =====
+
+  using RegisterBase::Is;
 
   bool Is(const CPURegister &reg) const {
     return (reg.reg_code_ == this->reg_code_);

@@ -28,7 +28,7 @@ class CPURegister : public RegisterBase {
 public:
   enum RegisterType { kDefault, kInvalid };
 
-  constexpr CPURegister(int code, int size, RegisterType type) : RegisterBase(code), reg_size_(size), reg_type_(type) {
+  constexpr CPURegister(int code, int size, RegisterType type) : RegisterBase(code), reg_type_(type), reg_size_(size) {
   }
 
   static constexpr CPURegister Create(int code, int size, RegisterType type) {

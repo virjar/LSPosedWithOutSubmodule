@@ -36,7 +36,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("org.eclipse.jgit:org.eclipse.jgit:6.1.0.202203080745-r")
+        classpath("org.eclipse.jgit:org.eclipse.jgit:6.2.0.202206071550-r")
     }
 }
 
@@ -51,10 +51,10 @@ val defaultManagerPackageName by extra("org.lsposed.manager")
 val apiCode by extra(93)
 val verCode by extra(commitCount + 4200)
 val verName by extra("1.8.3")
-val androidTargetSdkVersion by extra(32)
+val androidTargetSdkVersion by extra(33)
 val androidMinSdkVersion by extra(27)
 val androidBuildToolsVersion by extra("32.0.0")
-val androidCompileSdkVersion by extra(32)
+val androidCompileSdkVersion by extra(33)
 val androidCompileNdkVersion by extra("24.0.8215888")
 val androidSourceCompatibility by extra(JavaVersion.VERSION_11)
 val androidTargetCompatibility by extra(JavaVersion.VERSION_11)
@@ -78,6 +78,12 @@ fun Project.configureBaseExtension() {
         compileSdkVersion(androidCompileSdkVersion)
         ndkVersion = androidCompileNdkVersion
         buildToolsVersion = androidBuildToolsVersion
+
+        externalNativeBuild {
+            cmake {
+                version = "3.22.1+"
+            }
+        }
 
         defaultConfig {
             minSdk = androidMinSdkVersion
@@ -215,11 +221,21 @@ fun Project.configureBaseExtension() {
     }
 }
 
+fun Project.configureJavaExtension() {
+    extensions.findByType(JavaPluginExtension::class.java)?.run {
+        sourceCompatibility = androidSourceCompatibility
+        targetCompatibility = androidTargetCompatibility
+    }
+}
+
 subprojects {
     plugins.withId("com.android.application") {
         configureBaseExtension()
     }
     plugins.withId("com.android.library") {
         configureBaseExtension()
+    }
+    plugins.withId("org.gradle.java-library") {
+        configureJavaExtension()
     }
 }

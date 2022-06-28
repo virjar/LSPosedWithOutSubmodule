@@ -106,7 +106,7 @@ protected:
 // reloc
 class RelocLabelEntry : public PseudoLabel {
 public:
-  explicit RelocLabelEntry(uint32_t data) : data_size_(0) {
+  explicit RelocLabelEntry(uint32_t data) {
     data_ = data;
   }
 
@@ -120,8 +120,6 @@ public:
 
 private:
   uint32_t data_;
-
-  int data_size_;
 };
 
 // ================================================================
@@ -131,17 +129,17 @@ class Operand {
   friend class OpEncode;
 
 public:
-  Operand(int immediate) : imm_(immediate), rm_(no_reg), shift_(LSL), shift_imm_(0), rs_(no_reg) {
+  Operand(int immediate) : rm_(no_reg), rs_(no_reg), shift_(LSL), shift_imm_(0), imm_(immediate)  {
   }
 
-  Operand(Register rm) : imm_(0), rm_(rm), shift_(LSL), shift_imm_(0), rs_(no_reg) {
+  Operand(Register rm) : rm_(rm), rs_(no_reg), shift_(LSL), shift_imm_(0), imm_(0)  {
   }
 
   Operand(Register rm, Shift shift, uint32_t shift_imm)
-      : imm_(0), rm_(rm), shift_(shift), shift_imm_(shift_imm), rs_(no_reg) {
+      : rm_(rm), rs_(no_reg), shift_(shift), shift_imm_(shift_imm), imm_(0)  {
   }
 
-  Operand(Register rm, Shift shift, Register rs) : imm_(0), rm_(rm), shift_(shift), shift_imm_(0), rs_(rs) {
+  Operand(Register rm, Shift shift, Register rs) : rm_(rm), rs_(rs), shift_(shift), shift_imm_(0), imm_(0)  {
   }
 
 public:
@@ -170,15 +168,15 @@ class MemOperand {
 
 public:
   MemOperand(Register rn, int32_t offset = 0, AddrMode addrmode = Offset)
-      : rn_(rn), offset_(offset), rm_(no_reg), shift_(LSL), shift_imm_(0), addrmode_(addrmode) {
+      : rn_(rn), rm_(no_reg), offset_(offset), addrmode_(addrmode) {
   }
 
   MemOperand(Register rn, Register rm, AddrMode addrmode = Offset)
-      : rn_(rn), offset_(0), rm_(rm), shift_(LSL), shift_imm_(0), addrmode_(addrmode) {
+      : rn_(rn), rm_(rm), offset_(0), addrmode_(addrmode) {
   }
 
   MemOperand(Register rn, Register rm, Shift shift, uint32_t shift_imm, AddrMode addrmode = Offset)
-      : rn_(rn), offset_(0), rm_(rm), shift_(shift), shift_imm_(shift_imm), addrmode_(addrmode) {
+      : rn_(rn), rm_(rm), offset_(0), addrmode_(addrmode) {
   }
 
   const Register &rn() const {
@@ -209,9 +207,6 @@ private:
   Register rm_; // register offset
 
   int32_t offset_; // valid if rm_ == no_reg
-
-  Shift shift_;
-  uint32_t shift_imm_; // valid if rm_ != no_reg && rs_ == no_reg
 
   AddrMode addrmode_; // bits P, U, and W
 };
@@ -245,6 +240,8 @@ public:
     } else if (operand.addrmode_ == PreIndex) {
       P = 1;
       W = 1;
+    } else {
+      abort();
     }
     encoding |= ((P << 24) | (W << 21));
 

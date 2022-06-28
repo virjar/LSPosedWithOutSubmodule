@@ -213,7 +213,6 @@ MemoryChunk *NearMemoryArena::AllocateChunk(addr_t position, size_t alloc_range,
   if (page_chunks == NULL) {
     page_chunks = new LiteMutableArray(NEAR_PAGE_ARRAYLEN);
   }
-  MemoryChunk *result = NULL;
 
 search_once_more:
   LiteCollectionIterator iter(NearMemoryArena::page_chunks);

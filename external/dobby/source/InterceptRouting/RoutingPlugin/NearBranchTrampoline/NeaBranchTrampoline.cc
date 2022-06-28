@@ -42,9 +42,8 @@ bool NearBranchTrampolinePlugin::GenerateTrampolineBuffer(InterceptRouting *rout
 
 // generate trampoline, patch the original entry
 bool NearBranchTrampolinePlugin::Active(InterceptRouting *routing) {
-  addr_t src, dst;
   HookEntry *entry = routing->GetHookEntry();
-  src = (addr_t)entry->target_address;
-  dst = (addr_t)routing->GetTrampolineTarget();
+  [[maybe_unused]] auto src = (addr_t)entry->target_address;
+  [[maybe_unused]] auto dst = (addr_t)routing->GetTrampolineTarget();
   return true;
 }

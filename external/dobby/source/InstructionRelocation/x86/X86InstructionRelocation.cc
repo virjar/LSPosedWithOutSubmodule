@@ -33,7 +33,7 @@ static int GenRelocateCodeFixed(void *buffer, AssemblyCodeChunk *origin, Assembl
   int predefined_relocate_size = origin->raw_instruction_size();
 
   while ((buffer_cursor < ((addr_t)buffer + predefined_relocate_size))) {
-    int last_relo_offset = turbo_assembler_.GetCodeBuffer()->getSize();
+    [[maybe_unused]] int last_relo_offset = turbo_assembler_.GetCodeBuffer()->getSize();
 
     x86_insn_decode_t insn = {0};
     memset(&insn, 0, sizeof(insn));
@@ -94,7 +94,7 @@ static int GenRelocateCodeFixed(void *buffer, AssemblyCodeChunk *origin, Assembl
 
   // jmp to the origin rest instructions
   CodeGen codegen(&turbo_assembler_);
-  addr64_t stub_addr = curr_relo_ip + 6;
+  [[maybe_unused]] addr64_t stub_addr = curr_relo_ip + 6;
   codegen.JmpNear(curr_orig_ip);
 
   // update origin

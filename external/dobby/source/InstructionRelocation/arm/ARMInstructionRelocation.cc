@@ -19,9 +19,8 @@ typedef struct ReloMapEntry {
 } ReloMapEntry;
 
 static bool is_thumb2(uint32_t instr) {
-  uint16_t inst1, inst2;
+  uint16_t inst1;
   inst1 = instr & 0x0000ffff;
-  inst2 = (instr & 0xffff0000) >> 16;
   // refer: Top level T32 instruction set encoding
   uint32_t op0 = bits(inst1, 13, 15);
   uint32_t op1 = bits(inst1, 11, 12);
@@ -37,10 +36,9 @@ static void ARMRelocateSingleInstr(TurboAssembler *turbo_assembler, int32_t inst
   bool is_instr_relocated = false;
 #define _ turbo_assembler->
   // top level encoding
-  uint32_t cond, op0, op1;
-  cond = bits(instr, 28, 31);
-  op0 = bits(instr, 25, 27);
-  op1 = bit(instr, 4);
+  uint32_t cond = bits(instr, 28, 31);
+  uint32_t op0 = bits(instr, 25, 27);
+  [[maybe_unused]] uint32_t op1 = bit(instr, 4);
   // Load/Store Word, Unsigned byte (immediate, literal)
   if (cond != 0b1111 && op0 == 0b010) {
     uint32_t P, U, o2, W, o1, Rn, Rt, imm12;
@@ -88,11 +86,10 @@ static void ARMRelocateSingleInstr(TurboAssembler *turbo_assembler, int32_t inst
 
   // Data-processing and miscellaneous instructions
   if (cond != 0b1111 && (op0 & 0b110) == 0b000) {
-    uint32_t op0, op1, op2, op3, op4;
     op0 = bit(instr, 25);
     // Data-processing immediate
     if (op0 == 1) {
-      uint32_t op0, op1;
+      uint32_t op0;
       op0 = bits(instr, 23, 24);
       op1 = bits(instr, 20, 21);
       // Integer Data Processing (two register and immediate)
@@ -105,7 +102,6 @@ static void ARMRelocateSingleInstr(TurboAssembler *turbo_assembler, int32_t inst
           uint32_t target_address;
           int Rd = bits(instr, 12, 15);
           int imm12 = bits(instr, 0, 11);
-          int label = imm12;
           if (opc == 0b010 && S == 0b0 && Rn == 0b1111) {
             // ADR - A2 variant
             // add = FALSE
@@ -136,12 +132,12 @@ static void ARMRelocateSingleInstr(TurboAssembler *turbo_assembler, int32_t inst
 
   // Branch, branch with link, and block data transfer
   if ((op0 & 0b110) == 0b100) {
-    uint32_t cond, op0;
+    uint32_t op0;
     cond = bits(instr, 28, 31);
     op0 = bit(instr, 25);
     // Branch (immediate)
     if (op0 == 1) {
-      uint32_t cond = 0, H = 0, imm24 = 0;
+      uint32_t cond = 0, H = 0;
       bool flag_link;
       do {
         int imm24 = bits(instr, 0, 23);
@@ -192,10 +188,9 @@ static void Thumb1RelocateSingleInstr(ThumbTurboAssembler *turbo_assembler, Lite
 
   _ AlignThumbNop();
 
-  uint32_t val = 0, op = 0, rt = 0, rm = 0, rn = 0, rd = 0, shift = 0, cond = 0;
-  int32_t offset = 0;
+  uint32_t val = 0, rt = 0, rm = 0, rd = 0;
 
-  int32_t op0 = 0, op1 = 0;
+  int32_t op0 = 0;
   op0 = bits(instr, 10, 15);
   // [F3.2.3 Special data instructions and branch and exchange]
   if (op0 == 0b010001) {
@@ -322,7 +317,7 @@ static void Thumb1RelocateSingleInstr(ThumbTurboAssembler *turbo_assembler, Lite
     uint16_t i = bit(instr, 9);
     uint32_t offset = (i << 6) | (imm5 << 1);
     val = from_pc + offset;
-    rn = bits(instr, 0, 2);
+    [[maybe_unused]] uint32_t rn = bits(instr, 0, 2);
 
     ThumbRelocLabelEntry *label = new ThumbRelocLabelEntry(val + 1, true);
     _ AppendRelocLabelEntry(label);

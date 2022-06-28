@@ -25,11 +25,6 @@ public:
 
 private:
   virtual void BuildDynamicBinaryInstrumentRouting();
-
-private:
-  void *prologue_dispatch_bridge;
-
-  ;
 };
 
 #endif

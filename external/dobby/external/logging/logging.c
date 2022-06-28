@@ -32,7 +32,6 @@ PUBLIC void log_switch_to_syslog(void) {
 
 static int         _file_log_enabled = 0;
 static const char *log_file_path     = NULL;
-static int         log_file_fd       = -1;
 static FILE *      log_file_stream   = NULL;
 
 PUBLIC void log_switch_to_file(const char *path) {

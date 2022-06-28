@@ -63,25 +63,3 @@ static uint64_t read_qword(x86_insn_reader_t *rd) {
   rd->buffer_cursor += 4;
   return p[0];
 }
-
-static uint32_t read_imm(x86_insn_reader_t *rd, int size) {
-  DLOG(0, "[x86 insn reader] %p", rd->buffer_cursor);
-
-  return (size == 8) ? read_byte(rd) : (size == 16) ? read_word(rd) : (size == 32) ? read_dword(rd) : 0;
-}
-
-static unsigned char read_modrm(x86_insn_reader_t *rd) {
-  if (rd->buffer_cursor == rd->modrm)
-    rd->buffer_cursor++;
-  return *rd->modrm;
-}
-
-/* Marks the next byte as ModR/M. */
-static void continue_modrm(x86_insn_reader_t *rd) {
-  rd->modrm = rd->buffer_cursor;
-}
-
-/* Marks the next byte as opcode. */
-static void continue_opcode(x86_insn_reader_t *rd) {
-  rd->modrm = rd->opcode = rd->buffer_cursor;
-}
