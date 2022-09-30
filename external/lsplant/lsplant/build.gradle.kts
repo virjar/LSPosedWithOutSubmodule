@@ -20,6 +20,7 @@ android {
         buildConfig = false
         prefabPublishing = true
         androidResources = false
+        prefab = true
     }
 
     packagingOptions {
@@ -59,7 +60,6 @@ android {
                         "-ffunction-sections",
                         "-fdata-sections",
                         "-Wno-unused-value",
-                        "-Wl,--gc-sections",
                         "-D__FILE__=__FILE_NAME__",
                         "-Wl,--exclude-libs,ALL",
                     )
@@ -70,13 +70,51 @@ android {
                         "-DNDEBUG"
                     ).joinToString(" ")
                     arguments(
-                        "-DANDROID_STL=c++_shared",
                         "-DCMAKE_CXX_FLAGS_RELEASE=$configFlags",
-                        "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=$configFlags",
                         "-DCMAKE_C_FLAGS_RELEASE=$configFlags",
-                        "-DCMAKE_C_FLAGS_RELWITHDEBINFO=$configFlags",
                         "-DDEBUG_SYMBOLS_PATH=${project.buildDir.absolutePath}/symbols/$name",
                     )
+                }
+            }
+        }
+        release {
+            externalNativeBuild {
+                val flags = arrayOf(
+                    "-Wl,--gc-sections",
+                    "-flto",
+                    "-fno-unwind-tables",
+                    "-fno-asynchronous-unwind-tables",
+                )
+                cmake {
+                    cppFlags += flags
+                    cFlags += flags
+                    arguments += "-DANDROID_STL=c++_shared"
+                    arguments += "-DCMAKE_BUILD_TYPE=Release"
+                }
+            }
+        }
+        debug {
+            externalNativeBuild {
+                cmake {
+                    arguments += "-DANDROID_STL=c++_shared"
+                }
+            }
+        }
+        create("standalone") {
+            initWith(getByName("release"))
+            externalNativeBuild {
+                val flags = arrayOf(
+                    "-Wl,--gc-sections",
+                    "-flto",
+                    "-fno-unwind-tables",
+                    "-fno-asynchronous-unwind-tables",
+                )
+                cmake {
+                    cppFlags += flags
+                    cFlags += flags
+                    arguments += "-DANDROID_STL=none"
+                    arguments += "-DCMAKE_BUILD_TYPE=Release"
+                    arguments += "-DLSPLANT_STANDALONE=ON"
                 }
             }
         }
@@ -100,25 +138,30 @@ android {
             withSourcesJar()
             withJavadocJar()
         }
+        singleVariant("standalone") {
+            withSourcesJar()
+            withJavadocJar()
+        }
     }
 }
 
-val symbolsTask = tasks.register<Jar>("generateReleaseSymbolsJar") {
+val symbolsReleaseTask = tasks.register<Jar>("generateReleaseSymbolsJar") {
     from("${project.buildDir.absolutePath}/symbols/release")
+    exclude("**/dex_builder")
+    archiveClassifier.set("symbols")
+}
+
+val symbolsStandaloneTask = tasks.register<Jar>("generateStandaloneSymbolsJar") {
+    from("${project.buildDir.absolutePath}/symbols/standalone")
     exclude("**/dex_builder")
     archiveClassifier.set("symbols")
 }
 
 publishing {
     publications {
-        register<MavenPublication>("lsplant") {
+        fun MavenPublication.setup() {
             group = "org.lsposed.lsplant"
-            artifactId = "lsplant"
-            version = "4.2"
-            afterEvaluate {
-                from(components.getByName("release"))
-                artifact(symbolsTask)
-            }
+            version = "5.0"
             pom {
                 name.set("LSPlant")
                 description.set("A hook framework for Android Runtime (ART)")
@@ -141,6 +184,22 @@ publishing {
                 }
             }
         }
+        register<MavenPublication>("lsplant") {
+            artifactId = "lsplant"
+            afterEvaluate {
+                from(components.getByName("release"))
+                artifact(symbolsReleaseTask)
+            }
+            setup()
+        }
+        register<MavenPublication>("lsplantStandalone") {
+            artifactId = "lsplant-standalone"
+            afterEvaluate {
+                from(components.getByName("standalone"))
+                artifact(symbolsStandaloneTask)
+            }
+            setup()
+        }
     }
     repositories {
         maven {
@@ -156,6 +215,9 @@ publishing {
                 password = System.getenv("GITHUB_TOKEN")
             }
         }
+    }
+    dependencies {
+         "standaloneCompileOnly"("dev.rikka.ndk.thirdparty:cxx:1.2.0")
     }
 }
 
