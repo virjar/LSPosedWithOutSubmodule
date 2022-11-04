@@ -1,3 +1,5 @@
+import java.nio.file.Paths
+
 plugins {
     id("com.android.library")
     id("maven-publish")
@@ -10,6 +12,16 @@ val androidBuildToolsVersion: String by rootProject.extra
 val androidCompileSdkVersion: Int by rootProject.extra
 val androidNdkVersion: String by rootProject.extra
 val androidCmakeVersion: String by rootProject.extra
+
+fun findInPath(executable: String): String? {
+    val pathEnv = System.getenv("PATH")
+    return pathEnv.split(File.pathSeparator).map { folder ->
+        Paths.get("${folder}${File.separator}${executable}${if (org.gradle.internal.os.OperatingSystem.current().isWindows) ".exe" else ""}")
+            .toFile()
+    }.firstOrNull { path ->
+        path.exists()
+    }?.absolutePath
+}
 
 android {
     compileSdk = androidCompileSdkVersion
@@ -74,6 +86,10 @@ android {
                         "-DCMAKE_C_FLAGS_RELEASE=$configFlags",
                         "-DDEBUG_SYMBOLS_PATH=${project.buildDir.absolutePath}/symbols/$name",
                     )
+                    findInPath("ccache")?.let {
+                        println("Using ccache $it")
+                        arguments += "-DANDROID_CCACHE=$it"
+                    }
                 }
             }
         }
@@ -161,7 +177,7 @@ publishing {
     publications {
         fun MavenPublication.setup() {
             group = "org.lsposed.lsplant"
-            version = "5.0"
+            version = "5.2"
             pom {
                 name.set("LSPlant")
                 description.set("A hook framework for Android Runtime (ART)")

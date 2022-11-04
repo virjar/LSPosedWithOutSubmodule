@@ -136,14 +136,14 @@ materialThemeBuilder {
 }
 
 dependencies {
-    val glideVersion = "4.14.0"
+    val glideVersion = "4.14.2"
     val navVersion: String by project
     annotationProcessor("com.github.bumptech.glide:compiler:$glideVersion")
-    implementation("androidx.activity:activity:1.5.1")
+    implementation("androidx.activity:activity:1.6.0")
     implementation("androidx.browser:browser:1.4.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.core:core:1.9.0")
-    implementation("androidx.fragment:fragment:1.5.2")
+    implementation("androidx.fragment:fragment:1.5.3")
     implementation("androidx.navigation:navigation-fragment:$navVersion")
     implementation("androidx.navigation:navigation-ui:$navVersion")
     implementation("androidx.preference:preference:1.2.0")
@@ -151,7 +151,7 @@ dependencies {
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.2.0-alpha01")
     implementation("com.github.bumptech.glide:glide:$glideVersion")
     implementation("com.google.android.material:material:1.7.0-rc01")
-    implementation("com.google.code.gson:gson:2.9.1")
+    implementation("com.google.code.gson:gson:2.10")
     implementation(platform("com.squareup.okhttp3:okhttp-bom:4.10.0"))
     implementation("com.squareup.okhttp3:okhttp")
     implementation("com.squareup.okhttp3:okhttp-dnsoverhttps")

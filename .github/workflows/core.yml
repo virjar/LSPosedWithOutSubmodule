@@ -8,12 +8,15 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
-    if: ${{ !startsWith(github.event.head_commit.message, '[skip ci]') }}
-
+    runs-on: ubuntu-latest
+    env:
+      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
+      CCACHE_NOHASHDIR: "true"
+      CCACHE_MAXSIZE: "1G"
+      CCACHE_HARDLINK: "true"
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         submodules: 'recursive'
         fetch-depth: 0
@@ -27,18 +30,14 @@ jobs:
           echo androidStoreFile='key.jks' >> gradle.properties
           echo ${{ secrets.KEY_STORE }} | base64 --decode > key.jks
         fi
-    - name: Cache Gradle Dependencies
-      uses: actions/cache@v2
+    - name: Setup Java
+      uses: actions/setup-java@v3
       with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-          !~/.gradle/caches/build-cache-*
-        key: gradle-deps-core-${{ hashFiles('**/build.gradle.kts') }}
-        restore-keys: |
-          gradle-deps
+        distribution: 'temurin'
+        java-version: '17'
+        cache: 'gradle'
     - name: Cache Gradle Build
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: |
           ~/.gradle/caches/build-cache-*
@@ -46,24 +45,11 @@ jobs:
         key: gradle-builds-core-${{ github.sha }}
         restore-keys: |
           gradle-builds
-    - name: Cache native build
-      uses: actions/cache@v2
+    - name: Set up ccache
+      uses: hendrikmuhs/ccache-action@v1.2
       with:
-        path: |
-          ~/.ccache
-          magisk-loader/build/.lto-cache
-          daemon/build/.lto-cache
-          dex2oat/build/.lto-cache
-        key: native-cache-${{ github.sha }}
-        restore-keys: native-cache-
-    - name: Install dep
-      run: |
-        sudo apt-get install -y ccache
-        ccache -o max_size=1G
-        ccache -o hash_dir=false
-        ccache -o compiler_check='%compiler% -dumpmachine; %compiler% -dumpversion'
-        ccache -o hard_link=true
-        ccache -zp
+        key: ${{ runner.os }}
+        restore-keys: ${{ runner.os }}
     - name: Build with Gradle
       run: |
         [ $(du -s ~/.gradle/wrapper | awk '{ print $1 }') -gt 250000 ] && rm -rf ~/.gradle/wrapper/* || true
@@ -75,48 +61,47 @@ jobs:
         echo 'android.native.buildOutput=verbose' >> gradle.properties
         echo 'buildCache { local { removeUnusedEntriesAfterDays = 1 } }' >> settings.gradle.kts
         ./gradlew zipAll
-        ccache -s
     - name: Prepare artifact
       if: success()
       id: prepareArtifact
       run: |
-        riruReleaseName=`ls magisk-loader/release/LSPosed-v*-riru-release.zip | awk -F '(/|.zip)' '{print $3}'` && echo "::set-output name=riruReleaseName::$riruReleaseName"
-        riruDebugName=`ls magisk-loader/release/LSPosed-v*-riru-debug.zip | awk -F '(/|.zip)' '{print $3}'` && echo "::set-output name=riruDebugName::$riruDebugName"
-        zygiskReleaseName=`ls magisk-loader/release/LSPosed-v*-zygisk-release.zip | awk -F '(/|.zip)' '{print $3}'` && echo "::set-output name=zygiskReleaseName::$zygiskReleaseName"
-        zygiskDebugName=`ls magisk-loader/release/LSPosed-v*-zygisk-debug.zip | awk -F '(/|.zip)' '{print $3}'` && echo "::set-output name=zygiskDebugName::$zygiskDebugName"
+        riruReleaseName=`ls magisk-loader/release/LSPosed-v*-riru-release.zip | awk -F '(/|.zip)' '{print $3}'` && echo "riruReleaseName=$riruReleaseName" >> $GITHUB_OUTPUT
+        riruDebugName=`ls magisk-loader/release/LSPosed-v*-riru-debug.zip | awk -F '(/|.zip)' '{print $3}'` && echo "riruDebugName=$riruDebugName" >> $GITHUB_OUTPUT
+        zygiskReleaseName=`ls magisk-loader/release/LSPosed-v*-zygisk-release.zip | awk -F '(/|.zip)' '{print $3}'` && echo "zygiskReleaseName=$zygiskReleaseName" >> $GITHUB_OUTPUT
+        zygiskDebugName=`ls magisk-loader/release/LSPosed-v*-zygisk-debug.zip | awk -F '(/|.zip)' '{print $3}'` && echo "zygiskDebugName=$zygiskDebugName" >> $GITHUB_OUTPUT
         unzip magisk-loader/release/LSPosed-v*-riru-release.zip -d LSPosed-riru-release
         unzip magisk-loader/release/LSPosed-v*-riru-debug.zip -d LSPosed-riru-debug
         unzip magisk-loader/release/LSPosed-v*-zygisk-release.zip -d LSPosed-zygisk-release
         unzip magisk-loader/release/LSPosed-v*-zygisk-debug.zip -d LSPosed-zygisk-debug
     - name: Upload riru release
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: ${{ steps.prepareArtifact.outputs.riruReleaseName }}
         path: './LSPosed-riru-release/*'
     - name: Upload riru debug
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: ${{ steps.prepareArtifact.outputs.riruDebugName }}
         path: './LSPosed-riru-debug/*'
     - name: Upload zygisk release
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: ${{ steps.prepareArtifact.outputs.zygiskReleaseName }}
         path: './LSPosed-zygisk-release/*'
     - name: Upload zygisk debug
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: ${{ steps.prepareArtifact.outputs.zygiskDebugName }}
         path: './LSPosed-zygisk-debug/*'
     - name: Upload mappings
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: mappings
         path: |
           magisk-loader/build/outputs/mapping
           app/build/outputs/mapping
     - name: Upload symbols
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: symbols
         path: |
