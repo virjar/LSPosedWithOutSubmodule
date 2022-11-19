@@ -1,19 +1,21 @@
-#ifndef INTERCEPT_ROUTING_H
-#define INTERCEPT_ROUTING_H
+#pragma once
 
-#include "Interceptor.h"
+#include "InterceptEntry.h"
 #include "MemoryAllocator/AssemblyCodeBuilder.h"
 #include "InstructionRelocation/InstructionRelocation.h"
 #include "TrampolineBridge/Trampoline/Trampoline.h"
 
 class InterceptRouting {
 public:
-  InterceptRouting(HookEntry *entry) : entry_(entry) {
-    entry->route = this;
+  explicit InterceptRouting(InterceptEntry *entry) : entry_(entry) {
+    entry->routing = this;
 
-    trampoline_ = NULL;
-    trampoline_buffer_ = NULL;
-    trampoline_target_ = NULL;
+    origin_ = nullptr;
+    relocated_ = nullptr;
+
+    trampoline_ = nullptr;
+    trampoline_buffer_ = nullptr;
+    trampoline_target_ = 0;
   }
 
   virtual void DispatchRouting() = 0;
@@ -24,7 +26,7 @@ public:
 
   void Commit();
 
-  HookEntry *GetHookEntry();
+  InterceptEntry *GetInterceptEntry();
 
   void SetTrampolineBuffer(CodeBufferBase *buffer) {
     trampoline_buffer_ = buffer;
@@ -34,31 +36,27 @@ public:
     return trampoline_buffer_;
   }
 
-  void SetTrampolineTarget(void *address) {
+  void SetTrampolineTarget(addr_t address) {
     trampoline_target_ = address;
   }
 
-  void *GetTrampolineTarget() {
+  addr_t GetTrampolineTarget() {
     return trampoline_target_;
   }
 
 protected:
-  bool GenerateRelocatedCode(int tramp_size);
+  bool GenerateRelocatedCode();
 
-  bool GenerateTrampolineBuffer(void *src, void *dst);
+  bool GenerateTrampolineBuffer(addr_t src, addr_t dst);
 
 protected:
-  HookEntry *entry_;
+  InterceptEntry *entry_;
 
-  AssemblyCodeChunk *origin_;
+  CodeMemBlock *origin_;
+  CodeMemBlock *relocated_;
 
-  AssemblyCodeChunk *relocated_;
-
-  AssemblyCodeChunk *trampoline_;
-
+  CodeMemBlock *trampoline_;
   // trampoline buffer before active
   CodeBufferBase *trampoline_buffer_;
-
-  void *trampoline_target_;
+  addr_t trampoline_target_;
 };
-#endif

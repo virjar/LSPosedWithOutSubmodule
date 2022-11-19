@@ -10,24 +10,24 @@
 
 #include "MultiThreadSupport/ThreadSupport.h"
 
-#include "TrampolineBridge/ClosureTrampolineBridge/common-bridge-handler.h"
+#include "TrampolineBridge/ClosureTrampolineBridge/common_bridge_handler.h"
 
-void pre_call_forward_handler(RegisterContext *ctx, HookEntry *entry) {
-  FunctionWrapperRouting *route = (FunctionWrapperRouting *)entry->route;
+void pre_call_forward_handler(DobbyRegisterContext *ctx, InterceptEntry *entry) {
+  FunctionWrapperRouting *routing = (FunctionWrapperRouting *)entry->routing;
 
   StackFrame *stackframe = new StackFrame();
   // create stack frame as common variable between pre_call and post_call
   ThreadSupport::PushStackFrame(stackframe);
 
   // run the `pre_call` before execute origin function which has been relocated(fixed)
-  if (route->pre_call) {
+  if (routing->pre_call) {
     PreCallTy pre_call;
-    HookEntryInfo entry_info;
-    entry_info.hook_id = entry->id;
-    entry_info.target_address = entry->target_address;
-    pre_call = route->pre_call;
+    InterceptEntry entry;
+    entry.hook_id = entry->id;
+    entry.target_address = entry->target_address;
+    pre_call = routing->pre_call;
     // run the pre_call with the power of accessing all registers
-    (*pre_call)(ctx, (const HookEntryInfo *)&entry_info);
+    (*pre_call)(ctx, (const InterceptEntry *)&entry);
   }
 
   // save the origin ret address, and use in `post_call_forword_handler`
@@ -40,22 +40,22 @@ void pre_call_forward_handler(RegisterContext *ctx, HookEntry *entry) {
   set_func_ret_address(ctx, entry->epilogue_dispatch_bridge);
 }
 
-void post_call_forward_handler(RegisterContext *ctx, HookEntry *entry) {
-  FunctionWrapperRouting *route = (FunctionWrapperRouting *)entry->route;
+void post_call_forward_handler(DobbyRegisterContext *ctx, InterceptEntry *entry) {
+  FunctionWrapperRouting *routing = (FunctionWrapperRouting *)entry->routing;
 
   // pop stack frame as common variable between pre_call and post_call
   StackFrame *stackframe = ThreadSupport::PopStackFrame();
 
   // run the `post_call`, and access all the register value, as the origin function done,
-  if (route->post_call) {
+  if (routing->post_call) {
     PostCallTy post_call;
-    HookEntryInfo entry_info;
-    entry_info.hook_id = entry->id;
-    entry_info.target_address = entry->target_address;
-    post_call = route->post_call;
+    InterceptEntry entry;
+    entry.hook_id = entry->id;
+    entry.target_address = entry->target_address;
+    post_call = routing->post_call;
 
     // run the post_call with the power of accessing all registers
-    (*post_call)(ctx, (const HookEntryInfo *)&entry_info);
+    (*post_call)(ctx, (const InterceptEntry *)&entry);
   }
 
   // set epilogue bridge next hop address with origin ret address, restore the call.
@@ -63,17 +63,17 @@ void post_call_forward_handler(RegisterContext *ctx, HookEntry *entry) {
 }
 
 // run the user handler **before run the origin-instructions(which have been relocated)**
-void prologue_routing_dispatch(RegisterContext *ctx, ClosureTrampolineEntry *closure_trampoline_entry) {
+void prologue_routing_dispatch(DobbyRegisterContext *ctx, ClosureTrampolineEntry *closure_trampoline_entry) {
   DLOG(0, "Catch prologue dispatch");
-  HookEntry *entry = static_cast<HookEntry *>(closure_trampoline_entry->carry_data);
+  InterceptEntry *entry = static_cast<InterceptEntry *>(closure_trampoline_entry->carry_data);
   pre_call_forward_handler(ctx, entry);
   return;
 }
 
 // run the user handler **before the function return** by replace the lr register
-void epilogue_routing_dispatch(RegisterContext *ctx, ClosureTrampolineEntry *closure_trampoline_entry) {
+void epilogue_routing_dispatch(DobbyRegisterContext *ctx, ClosureTrampolineEntry *closure_trampoline_entry) {
   DLOG(0, "Catch epilogue dispatch");
-  HookEntry *entry = static_cast<HookEntry *>(closure_trampoline_entry->carry_data);
+  InterceptEntry *entry = static_cast<InterceptEntry *>(closure_trampoline_entry->carry_data);
   post_call_forward_handler(ctx, entry);
   return;
 }

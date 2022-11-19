@@ -5,68 +5,78 @@
 
 using namespace zz;
 
+void log_hex_format(uint8_t *buffer, uint32_t buffer_size) {
+  char output[1024] = {0};
+  for (int i = 0; i < buffer_size && i < sizeof(output); i++) {
+    snprintf(output + strlen(output), 3, "%02x ", *((uint8_t *)buffer + i));
+  }
+  DLOG(0, "%s", output);
+};
+
 void InterceptRouting::Prepare() {
 }
 
-// Generate relocated code
-bool InterceptRouting::GenerateRelocatedCode(int tramp_size) {
-  // generate original code
-  AssemblyCodeChunk *origin = NULL;
-  origin = AssemblyCodeBuilder::FinalizeFromAddress((addr_t)entry_->target_address, tramp_size);
-  origin_ = origin;
+// generate relocated code
+bool InterceptRouting::GenerateRelocatedCode() {
+  uint32_t tramp_size = GetTrampolineBuffer()->GetBufferSize();
+  origin_ = new CodeMemBlock(entry_->patched_addr, tramp_size);
+  relocated_ = new CodeMemBlock();
 
-  // generate the relocated code
-  AssemblyCodeChunk *relocated = NULL;
-  relocated = AssemblyCodeBuilder::FinalizeFromAddress(0, 0);
-  relocated_ = relocated;
-
-  void *relocate_buffer = NULL;
-  relocate_buffer = entry_->target_address;
-
-  GenRelocateCodeAndBranch(relocate_buffer, origin, relocated);
-  if (relocated->raw_instruction_start() == 0)
+  auto buffer = (void *)entry_->patched_addr;
+#if defined(TARGET_ARCH_ARM)
+  if (entry_->thumb_mode) {
+    buffer = (void *)((addr_t)buffer + 1);
+  }
+#endif
+  GenRelocateCodeAndBranch(buffer, origin_, relocated_);
+  if (relocated_->size == 0) {
+    ERROR_LOG("[insn relocate]] failed");
     return false;
+  }
 
   // set the relocated instruction address
-  entry_->relocated_origin_instructions = (void *)relocated->raw_instruction_start();
-  DLOG(0, "[insn relocate] origin %p - %d", origin->raw_instruction_start(), origin->raw_instruction_size());
-  DLOG(0, "[insn relocate] relocated %p - %d", relocated->raw_instruction_start(), relocated->raw_instruction_size());
+  entry_->relocated_addr = relocated_->addr;
 
   // save original prologue
-  memcpy((void *)entry_->origin_chunk_.chunk_buffer, (void *)origin_->raw_instruction_start(),
-         origin_->raw_instruction_size());
-  entry_->origin_chunk_.chunk.re_init_region_range(origin_);
+  memcpy((void *)entry_->origin_insns, (void *)origin_->addr, origin_->size);
+  entry_->origin_insn_size = origin_->size;
+
+  // log
+  DLOG(0, "[insn relocate] origin %p - %d", origin_->addr, origin_->size);
+  log_hex_format((uint8_t *)origin_->addr, origin_->size);
+
+  DLOG(0, "[insn relocate] relocated %p - %d", relocated_->addr, relocated_->size);
+  log_hex_format((uint8_t *)relocated_->addr, relocated_->size);
+
   return true;
 }
 
-bool InterceptRouting::GenerateTrampolineBuffer(void *src, void *dst) {
-  CodeBufferBase *trampoline_buffer = NULL;
+bool InterceptRouting::GenerateTrampolineBuffer(addr_t src, addr_t dst) {
   // if near branch trampoline plugin enabled
   if (RoutingPluginManager::near_branch_trampoline) {
-    RoutingPluginInterface *plugin = NULL;
-    plugin = reinterpret_cast<RoutingPluginInterface *>(RoutingPluginManager::near_branch_trampoline);
+    auto plugin = static_cast<RoutingPluginInterface *>(RoutingPluginManager::near_branch_trampoline);
     if (plugin->GenerateTrampolineBuffer(this, src, dst) == false) {
       DLOG(0, "Failed enable near branch trampoline plugin");
     }
   }
 
-  if (this->GetTrampolineBuffer() == NULL) {
-    trampoline_buffer = GenerateNormalTrampolineBuffer((addr_t)src, (addr_t)dst);
-    this->SetTrampolineBuffer(trampoline_buffer);
-
-    DLOG(0, "[trampoline] Generate trampoline buffer %p -> %p", src, dst);
+  if (GetTrampolineBuffer() == nullptr) {
+    auto tramp_buffer = GenerateNormalTrampolineBuffer(src, dst);
+    SetTrampolineBuffer(tramp_buffer);
   }
   return true;
 }
 
-// Active routing, will patch the origin insturctions, and forward to our custom routing.
-// Patch the address with branch instr
+// active routing, patch origin instructions as trampoline
 void InterceptRouting::Active() {
-  void *patch_address = NULL;
-  patch_address = (void *)origin_->raw_instruction_start();
-
-  CodePatch(patch_address, (uint8_t *)trampoline_buffer_->getRawBuffer(), trampoline_buffer_->getSize());
-  DLOG(0, "[intercept routing] Active patch %p", patch_address);
+  MemoryOperationError err;
+  err = DobbyCodePatch((void *)entry_->patched_addr, trampoline_buffer_->GetBuffer(),
+                       trampoline_buffer_->GetBufferSize());
+  if (err != kMemoryOperationSuccess) {
+    ERROR_LOG("[intercept routing] active failed");
+    return;
+  }
+  DLOG(0, "[intercept routing] active");
 }
 
 void InterceptRouting::Commit() {
@@ -83,6 +93,6 @@ int InterceptRouting::PredefinedTrampolineSize() {
 }
 #endif
 
-HookEntry *InterceptRouting::GetHookEntry() {
+InterceptEntry *InterceptRouting::GetInterceptEntry() {
   return entry_;
 };

@@ -1,37 +1,25 @@
-#ifndef INTERCEPTOR_H
-#define INTERCEPTOR_H
+#pragma once
 
 #include "dobby_internal.h"
-
-#include "include/list_structure.h"
-
-typedef struct {
-  struct list_head list_node;
-  HookEntry *entry;
-} HookEntryNode;
+#include "InterceptEntry.h"
 
 class Interceptor {
 public:
   static Interceptor *SharedInstance();
 
-  HookEntry *FindHookEntry(void *address);
+public:
+  InterceptEntry *find(addr_t addr);
 
-  void AddHookEntry(HookEntry *entry);
+  void remove(addr_t addr);
 
-  void RemoveHookEntry(void *address);
+  void add(InterceptEntry *entry);
 
-  int GetHookEntryCount();
+  const InterceptEntry *getEntry(int i);
 
-private:
-  Interceptor() {
-  }
-
-  HookEntryNode *find_hook_entry_node(void *address);
+  int count();
 
 private:
-  struct list_head hook_entry_list_;
+  static Interceptor *instance;
 
-  static Interceptor *priv_interceptor_;
+  tinystl::vector<InterceptEntry *> entries;
 };
-
-#endif

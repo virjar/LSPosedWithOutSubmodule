@@ -1,40 +1,120 @@
-cmake_minimum_required(VERSION 3.5)
-project(test_dobby)
 
-set(PrimaryPath ..)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(CAPSTONE REQUIRED capstone)
+message(STATUS "Capstone libraries: " ${CAPSTONE_LIBRARY_DIRS})
+message(STATUS "Capstone includes: " ${CAPSTONE_INCLUDE_DIRS})
 
-include(${PrimaryPath}/cmake/Globals.cmake)
-include(${PrimaryPath}/cmake/Macros.cmake)
+pkg_check_modules(UNICORN REQUIRED unicorn)
+message(STATUS "unicorn libraries: " ${UNICORN_LIBRARY_DIRS})
+message(STATUS "unicorn includes: " ${UNICORN_INCLUDE_DIRS})
 
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_C_STANDARD 11)
-enable_language(ASM)
+get_property(DOBBY_SOURCE_FILE_LIST
+  TARGET dobby
+  PROPERTY SOURCES)
+
+set(DOBBY_SOURCES)
+foreach (path ${DOBBY_SOURCE_FILE_LIST})
+  if (NOT path MATCHES "^/")
+    list(APPEND DOBBY_SOURCES ${DOBBY_DIR}/${path})
+  else ()
+    list(APPEND DOBBY_SOURCES ${path})
+  endif ()
+endforeach ()
 
 
-include_directories(
-    ${PrimaryPath}/tests
-    ${PrimaryPath}/source
-)
+add_executable(test_insn_relo_arm64
+  test_insn_relo_arm64.cpp
+  UniconEmulator.cpp
+  ${DOBBY_SOURCES}
+  )
 
-include_directories(
-  ${PrimaryPath}/source
-  ${PrimaryPath}/source/UserMode
-  ${PrimaryPath}/external
-  ${PrimaryPath}/external/logging
-  ${PrimaryPath}/external/xnucxx
-)
+target_compile_definitions(test_insn_relo_arm64 PUBLIC
+  LOGGING_DEBUG=1
+  DISABLE_ARCH_DETECT=1
+  TARGET_ARCH_ARM64=1
+  TEST_WITH_UNICORN=1
+  )
 
-add_subdirectory(${PrimaryPath} dobby.out)
+target_include_directories(test_insn_relo_arm64 PUBLIC
+  ${CAPSTONE_INCLUDE_DIRS}
+  ${UNICORN_INCLUDE_DIRS}
+  )
 
-add_executable(tests_instr_relo_x64
-    ${PrimaryPath}/source/InstructionRelocation/x64/X64IPRelativeOpcodeTable.cc
-    ${PrimaryPath}/tests/InstructionRelocation/x64/test_x64_instruction_relocation.cc
-)
+target_link_directories(test_insn_relo_arm64 PUBLIC
+  ${CAPSTONE_LIBRARY_DIRS}
+  ${UNICORN_LIBRARY_DIRS}
+  )
 
-add_executable(tests_instr_relo_aarch64
-    ${PrimaryPath}/tests/InstructionRelocation/aarch64/test_aarch64_instruction_relocation.cc
-)
-target_link_libraries(tests_instr_relo_aarch64
-    dobby
-)
+target_link_libraries(test_insn_relo_arm64 PUBLIC
+  ${CAPSTONE_LIBRARIES}
+  ${UNICORN_LIBRARIES}
+  )
+
+# ---
+
+add_executable(test_insn_relo_arm
+  test_insn_relo_arm.cpp
+  UniconEmulator.cpp
+  ${DOBBY_SOURCES}
+  )
+
+target_compile_definitions(test_insn_relo_arm PUBLIC
+  LOGGING_DEBUG=1
+  DISABLE_ARCH_DETECT=1
+  TARGET_ARCH_ARM=1
+  TEST_WITH_UNICORN=1
+  )
+
+target_include_directories(test_insn_relo_arm PUBLIC
+  ${CAPSTONE_INCLUDE_DIRS}
+  ${UNICORN_INCLUDE_DIRS}
+  )
+
+target_link_directories(test_insn_relo_arm PUBLIC
+  ${CAPSTONE_LIBRARY_DIRS}
+  ${UNICORN_LIBRARY_DIRS}
+  )
+
+target_link_libraries(test_insn_relo_arm PUBLIC
+  ${CAPSTONE_LIBRARIES}
+  ${UNICORN_LIBRARIES}
+  )
+
+# ---
+
+add_executable(test_insn_relo_x64
+  test_insn_relo_x64.cpp
+  UniconEmulator.cpp
+  ${DOBBY_SOURCES}
+  )
+
+target_compile_definitions(test_insn_relo_x64 PUBLIC
+  LOGGING_DEBUG=1
+  DISABLE_ARCH_DETECT=1
+  TARGET_ARCH_X64=1
+  TEST_WITH_UNICORN=1
+  # TARGET_ARCH_IA32=1
+  )
+
+target_include_directories(test_insn_relo_x64 PUBLIC
+  ${CAPSTONE_INCLUDE_DIRS}
+  ${UNICORN_INCLUDE_DIRS}
+  )
+
+target_link_directories(test_insn_relo_x64 PUBLIC
+  ${CAPSTONE_LIBRARY_DIRS}
+  ${UNICORN_LIBRARY_DIRS}
+  )
+
+target_link_libraries(test_insn_relo_x64 PUBLIC
+  ${CAPSTONE_LIBRARIES}
+  ${UNICORN_LIBRARIES}
+  )
+
+# ---
+
+add_executable(test_native
+  test_native.cpp)
+
+target_link_libraries(test_native
+  dobby)

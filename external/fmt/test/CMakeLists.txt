@@ -8,9 +8,6 @@ target_link_libraries(test-main gtest fmt)
 
 function(add_fmt_executable name)
   add_executable(${name} ${ARGN})
-  if (MINGW)
-    target_link_libraries(${name} -static-libgcc -static-libstdc++)
-  endif ()
   # (Wstringop-overflow) - [meta-bug] bogus/missing -Wstringop-overflow warnings
   #   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=88443
   # Bogus -Wstringop-overflow warning
@@ -19,6 +16,8 @@ function(add_fmt_executable name)
   #   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=95353
   if (CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND
       NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7.0)
+    target_compile_options(${name} PRIVATE -Wno-stringop-overflow)
+    # The linker flag is needed for LTO.
     target_link_libraries(${name} -Wno-stringop-overflow)
   endif ()
 endfunction()
@@ -77,6 +76,15 @@ endif()
 add_fmt_test(printf-test)
 add_fmt_test(ranges-test ranges-odr-test.cc)
 add_fmt_test(scan-test)
+add_fmt_test(std-test)
+try_compile(compile_result_unused
+            ${CMAKE_CURRENT_BINARY_DIR}
+            SOURCES ${CMAKE_CURRENT_LIST_DIR}/detect-stdfs.cc
+            OUTPUT_VARIABLE RAWOUTPUT)
+string(REGEX REPLACE ".*libfound \"([^\"]*)\".*" "\\1" STDLIBFS "${RAWOUTPUT}")
+if (STDLIBFS)
+  target_link_libraries(std-test ${STDLIBFS})
+endif ()
 add_fmt_test(unicode-test HEADER_ONLY)
 if (MSVC)
   target_compile_options(unicode-test PRIVATE /utf-8)

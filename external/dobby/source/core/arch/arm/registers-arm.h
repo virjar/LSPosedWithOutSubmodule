@@ -30,8 +30,6 @@ public:
     return Register(code);
   }
 
-  using RegisterBase::Is;
-
   bool Is(const Register &reg) const {
     return (reg.reg_code_ == this->reg_code_);
   }
