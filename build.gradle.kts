@@ -21,7 +21,7 @@ import com.android.build.api.dsl.ApplicationExtension
 import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import com.android.build.gradle.BaseExtension
 import org.eclipse.jgit.api.Git
-import org.eclipse.jgit.internal.storage.file.FileRepository
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder
 import java.nio.file.Paths
 import org.gradle.internal.os.OperatingSystem
 
@@ -36,24 +36,34 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("org.eclipse.jgit:org.eclipse.jgit:6.3.0.202209071007-r")
+        classpath("org.eclipse.jgit:org.eclipse.jgit:6.4.0.202211300538-r")
     }
 }
-
-val repo = FileRepository(rootProject.file(".git"))
-val refId = repo.refDatabase.exactRef("refs/remotes/origin/master").objectId!!
-val commitCount = Git(repo).log().add(refId).call().count()
+val (commitCount, latestTag) = FileRepositoryBuilder().setGitDir(rootProject.file(".git"))
+    .runCatching {
+        build().use { repo ->
+            val git = Git(repo)
+            val commitCount =
+                git.log()
+                    .add(repo.refDatabase.exactRef("refs/remotes/origin/master").objectId)
+                    .call().count() + 4200
+            val ver = git.describe()
+                .setTags(true)
+                .setAbbrev(0).call().removePrefix("v")
+            commitCount to ver
+        }
+    }.getOrNull() ?: (1 to "1.0")
 
 val injectedPackageName by extra("com.android.shell")
 val injectedPackageUid by extra(2000)
 
 val defaultManagerPackageName by extra("org.lsposed.manager")
 val apiCode by extra(93)
-val verCode by extra(commitCount + 4200)
-val verName by extra("1.8.5")
+val verCode by extra(commitCount)
+val verName by extra(latestTag)
 val androidTargetSdkVersion by extra(33)
 val androidMinSdkVersion by extra(27)
-val androidBuildToolsVersion by extra("32.0.0")
+val androidBuildToolsVersion by extra("33.0.1")
 val androidCompileSdkVersion by extra(33)
 val androidCompileNdkVersion by extra("25.1.8937393")
 val androidSourceCompatibility by extra(JavaVersion.VERSION_11)
@@ -115,8 +125,6 @@ fun Project.configureBaseExtension() {
                     cFlags("-std=c18", *flags)
                     arguments(
                         "-DANDROID_STL=none",
-                        "-DVERSION_CODE=$verCode",
-                        "-DVERSION_NAME=$verName",
                     )
                     findInPath("ccache")?.let {
                         println("Using ccache $it")

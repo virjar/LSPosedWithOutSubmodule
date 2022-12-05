@@ -1,6 +1,4 @@
 import com.android.build.api.dsl.ManagedVirtualDevice
-import com.android.build.gradle.internal.tasks.ManagedDeviceInstrumentationTestTask
-import com.android.build.gradle.internal.tasks.ManagedDeviceSetupTask
 
 plugins {
     id("com.android.application")
@@ -98,19 +96,3 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.0")
 }
 
-afterEvaluate {
-    var lastTask: Task? = null
-    tasks.withType(ManagedDeviceInstrumentationTestTask::class.java) {
-        lastTask?.let { l ->
-            taskDependencies.getDependencies(this).firstOrNull {
-                it is ManagedDeviceSetupTask
-            }?.run {
-                dependsOn("assembleAndroidTest")
-                mustRunAfter(l)
-                doFirst { println("::group::${deviceName.get()}") }
-            }
-        }
-        doLast { println("::endgroup::") }
-        lastTask = this
-    }
-}

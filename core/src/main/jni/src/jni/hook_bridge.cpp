@@ -23,6 +23,7 @@
 #include <absl/container/flat_hash_map.h>
 #include <memory>
 #include <shared_mutex>
+#include <mutex>
 #include <set>
 
 using namespace lsplant;
@@ -35,6 +36,7 @@ struct HookItem {
 };
 
 std::shared_mutex hooked_lock;
+std::recursive_mutex backup_lock;
 absl::flat_hash_map<jmethodID, std::unique_ptr<HookItem>> hooked_methods;
 
 jmethodID invoke = nullptr;
@@ -83,6 +85,7 @@ LSP_DEF_NATIVE_METHOD(jboolean, HookBridge, hookMethod, jobject hookMethod,
                                                                                "([Ljava/lang/Object;)Ljava/lang/Object;"),
                                                       false);
         auto hooker_object = env->NewObject(hooker, init, hookMethod);
+        std::unique_lock lk(backup_lock);
         hook_item->backup = lsplant::Hook(env, hookMethod, hooker_object, callback_method);
         env->DeleteLocalRef(hooker_object);
     }
@@ -101,7 +104,13 @@ LSP_DEF_NATIVE_METHOD(jboolean, HookBridge, unhookMethod, jobject hookMethod, jo
         }
     }
     if (!hook_item) return JNI_FALSE;
-    JNIMonitor monitor(env, hook_item->backup);
+    jobject backup = nullptr;
+    {
+        std::unique_lock lk(backup_lock);
+        backup = hook_item->backup;
+    }
+    if (!backup) return JNI_FALSE;
+    JNIMonitor monitor(env, backup);
     for (auto i = hook_item->callbacks.begin(); i != hook_item->callbacks.end(); ++i) {
         if (env->IsSameObject(i->second, callback)) {
             hook_item->callbacks.erase(i);
@@ -127,8 +136,9 @@ LSP_DEF_NATIVE_METHOD(jobject, HookBridge, invokeOriginalMethod, jobject hookMet
         }
     }
     jobject to_call = hookMethod;
-    if (hook_item && hook_item->backup) {
-        to_call = hook_item->backup;
+    if (hook_item) {
+        std::unique_lock lk(backup_lock);
+        if (hook_item->backup) to_call = hook_item->backup;
     }
     return env->CallObjectMethod(to_call, invoke, thiz, args);
 }
@@ -151,7 +161,13 @@ LSP_DEF_NATIVE_METHOD(jobjectArray, HookBridge, callbackSnapshot, jobject method
         }
     }
     if (!hook_item) return nullptr;
-    JNIMonitor monitor(env, hook_item->backup);
+    jobject backup = nullptr;
+    {
+        std::unique_lock lk(backup_lock);
+        backup = hook_item->backup;
+    }
+    if (!backup) return nullptr;
+    JNIMonitor monitor(env, backup);
     auto res = env->NewObjectArray((jsize) hook_item->callbacks.size(), env->FindClass("java/lang/Object"), nullptr);
     for (jsize i = 0; auto callback: hook_item->callbacks) {
         env->SetObjectArrayElement(res, i++, env->NewLocalRef(callback.second));

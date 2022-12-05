@@ -134,18 +134,18 @@ public class ConfigManager {
         return list;
     }
 
-    public static boolean isAddShortcut() {
+    public static boolean enableStatusNotification() {
         try {
-            return LSPManagerServiceHolder.getService().isAddShortcut();
+            return LSPManagerServiceHolder.getService().enableStatusNotification();
         } catch (RemoteException e) {
             Log.e(App.TAG, Log.getStackTraceString(e));
             return false;
         }
     }
 
-    public static boolean setAddShortcut(boolean enabled) {
+    public static boolean setEnableStatusNotification(boolean enabled) {
         try {
-            LSPManagerServiceHolder.getService().setAddShortcut(enabled);
+            LSPManagerServiceHolder.getService().setEnableStatusNotification(enabled);
             return true;
         } catch (RemoteException e) {
             Log.e(App.TAG, Log.getStackTraceString(e));
