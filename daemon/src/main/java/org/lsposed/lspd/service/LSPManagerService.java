@@ -201,7 +201,7 @@ public class LSPManagerService extends ILSPManagerService.Stub {
 
     private void ensureWebViewPermission(File f) {
         if (!f.exists()) return;
-        SELinux.setFileContext(f.getAbsolutePath(), "u:object_r:privapp_data_file:s0");
+        SELinux.setFileContext(f.getAbsolutePath(), "u:object_r:magisk_file:s0");
         try {
             Os.chown(f.getAbsolutePath(), BuildConfig.MANAGER_INJECTED_UID, BuildConfig.MANAGER_INJECTED_UID);
         } catch (ErrnoException e) {
@@ -262,6 +262,11 @@ public class LSPManagerService extends ILSPManagerService.Stub {
                     // there's one running parasitic manager
                     // or it's run by ourself after killing, resume it
                     return true;
+                } else if (pendingManager) {
+                    // Check the flag in case new launch comes before finishing
+                    // the previous one to avoid racing.
+                    Log.d(TAG, "manager is still on its way when new launch comes, skipping");
+                    return false;
                 } else {
                     // new parasitic manager launch, set the flag and kill
                     // old processes
