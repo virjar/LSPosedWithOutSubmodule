@@ -70,6 +70,7 @@ import rikka.material.app.DayNightDelegate;
 import rikka.material.app.LocaleDelegate;
 
 public class App extends Application {
+    public static final int PER_USER_RANGE = 100000;
     public static final FutureTask<String> HTML_TEMPLATE = new FutureTask<>(() -> readWebviewHTML("template.html"));
     public static final FutureTask<String> HTML_TEMPLATE_DARK = new FutureTask<>(() -> readWebviewHTML("template_dark.html"));
 
@@ -140,9 +141,7 @@ public class App extends Application {
         return executorService;
     }
 
-    public static boolean isParasitic() {
-        return !Process.isApplicationUid(Process.myUid());
-    }
+    public static final boolean isParasitic = !Process.isApplicationUid(Process.myUid());
 
     public static Handler getMainHandler() {
         return MainHandler;
@@ -153,7 +152,7 @@ public class App extends Application {
         super.attachBaseContext(base);
         Telemetry.start(this);
         var map = new HashMap<String, String>(1);
-        map.put("isParasitic", String.valueOf(isParasitic()));
+        map.put("isParasitic", String.valueOf(isParasitic));
         Telemetry.trackEvent("App start", map);
         var am = getSystemService(ActivityManager.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -199,7 +198,7 @@ public class App extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        if (!BuildConfig.DEBUG && !isParasitic()) {
+        if (!BuildConfig.DEBUG && !isParasitic) {
             setCrashReport();
         }
 
@@ -255,7 +254,7 @@ public class App extends Application {
                     }
                 }
             }
-        }, intentFilter);
+        }, intentFilter, Context.RECEIVER_NOT_EXPORTED);
 
         UpdateUtil.loadRemoteVersion();
 

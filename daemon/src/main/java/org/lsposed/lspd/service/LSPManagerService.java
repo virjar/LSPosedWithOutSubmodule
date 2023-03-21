@@ -63,6 +63,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import hidden.HiddenApiBridge;
+import io.github.libxposed.service.IXposedService;
 import rikka.parcelablelist.ParcelableListSlice;
 
 public class LSPManagerService extends ILSPManagerService.Stub {
@@ -217,14 +218,12 @@ public class LSPManagerService extends ILSPManagerService.Stub {
     private void ensureWebViewPermission() {
         try {
             var pkgInfo = PackageService.getPackageInfo(BuildConfig.MANAGER_INJECTED_PKG_NAME, 0, 0);
-            File cacheDir = null;
             if (pkgInfo != null) {
-                cacheDir = new File(HiddenApiBridge.ApplicationInfo_credentialProtectedDataDir(pkgInfo.applicationInfo) + "/cache");
+                var cacheDir = new File(HiddenApiBridge.ApplicationInfo_credentialProtectedDataDir(pkgInfo.applicationInfo) + "/cache");
+                // The cache directory does not exist after `pm clear`
+                cacheDir.mkdirs();
+                ensureWebViewPermission(cacheDir);
             }
-
-            // The cache directory does not exist after `pm clear`
-            cacheDir.mkdirs();
-            ensureWebViewPermission(cacheDir);
         } catch (Throwable e) {
             Log.w(TAG, "cannot ensure webview dir", e);
         }
@@ -362,7 +361,7 @@ public class LSPManagerService extends ILSPManagerService.Stub {
 
     @Override
     public int getXposedApiVersion() {
-        return BuildConfig.API_CODE;
+        return IXposedService.API;
     }
 
     @Override
@@ -447,9 +446,8 @@ public class LSPManagerService extends ILSPManagerService.Stub {
     }
 
     @Override
-    public void reboot(boolean shutdown) {
-        var value = shutdown ? "shutdown" : "reboot";
-        SystemProperties.set("sys.powerctl", value);
+    public void reboot() throws RemoteException {
+        PowerService.reboot(false, null, false);
     }
 
     @Override
@@ -469,7 +467,8 @@ public class LSPManagerService extends ILSPManagerService.Stub {
 
     @Override
     public boolean isSepolicyLoaded() {
-        return ConfigManager.getInstance().isSepolicyLoaded();
+        return SELinux.checkSELinuxAccess("u:r:dex2oat:s0", "u:object_r:dex2oat_exec:s0",
+                "file", "execute_no_trans");
     }
 
     @Override
@@ -528,7 +527,7 @@ public class LSPManagerService extends ILSPManagerService.Stub {
 
     @Override
     public boolean dex2oatFlagsLoaded() {
-        return SystemProperties.get(Dex2OatService.PROP_NAME).contains(Dex2OatService.PROP_VALUE);
+        return SystemProperties.get("dalvik.vm.dex2oat-flags").contains("--inline-max-code-units=0");
     }
 
     @Override
@@ -558,7 +557,7 @@ public class LSPManagerService extends ILSPManagerService.Stub {
     }
 
     @Override
-    public void getLogs(ParcelFileDescriptor zipFd) throws RemoteException {
+    public void getLogs(ParcelFileDescriptor zipFd) {
         ConfigFileManager.getLogs(zipFd);
     }
 
@@ -585,7 +584,7 @@ public class LSPManagerService extends ILSPManagerService.Stub {
                 if (exit == 0) {
                     fdw.write("- Reboot after 5s\n".getBytes());
                     Thread.sleep(5000);
-                    reboot(false);
+                    reboot();
                 } else {
                     var s = "! Flash failed, exit with " + exit + "\n";
                     fdw.write(s.getBytes());
@@ -594,7 +593,7 @@ public class LSPManagerService extends ILSPManagerService.Stub {
                 proc.destroy();
                 fdw.write("! Timeout, abort\n".getBytes());
             }
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException | InterruptedException | RemoteException e) {
             Log.e(TAG, "flashZip: ", e);
         }
     }

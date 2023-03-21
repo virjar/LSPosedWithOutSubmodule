@@ -22,17 +22,21 @@ package org.lsposed.lspd.hooker;
 
 import static org.lsposed.lspd.util.Utils.logD;
 
+import androidx.annotation.NonNull;
+
+import org.lsposed.lspd.impl.LSPosedContext;
 import org.lsposed.lspd.util.Hookers;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedInit;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
+import io.github.libxposed.api.XposedModuleInterface;
 
 public class StartBootstrapServicesHooker extends XC_MethodHook {
 
     @Override
-    protected void beforeHookedMethod(MethodHookParam param) {
+    protected void beforeHookedMethod(MethodHookParam<?> param) {
         logD("SystemServer#startBootstrapServices() starts");
 
         try {
@@ -45,6 +49,14 @@ public class StartBootstrapServicesHooker extends XC_MethodHook {
             lpparam.appInfo = null;
             lpparam.isFirstApplication = true;
             XC_LoadPackage.callAll(lpparam);
+
+            LSPosedContext.callOnSystemServerLoaded(new XposedModuleInterface.SystemServerLoadedParam() {
+                @Override
+                @NonNull
+                public ClassLoader getClassLoader() {
+                    return HandleSystemServerProcessHooker.systemServerCL;
+                }
+            });
         } catch (Throwable t) {
             Hookers.logE("error when hooking startBootstrapServices", t);
         }

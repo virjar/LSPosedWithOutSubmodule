@@ -153,29 +153,31 @@ public class SettingsFragment extends BaseFragment {
                 prefDexObfuscate.setEnabled(installed);
                 prefDexObfuscate.setChecked(!installed || ConfigManager.isDexObfuscateEnabled());
                 prefDexObfuscate.setOnPreferenceChangeListener((preference, newValue) -> {
-                    parentFragment.showHint(R.string.reboot_required, true, R.string.reboot, v -> ConfigManager.reboot(false));
+                    parentFragment.showHint(R.string.reboot_required, true, R.string.reboot, v -> ConfigManager.reboot());
                     return ConfigManager.setDexObfuscateEnabled((boolean) newValue);
                 });
             }
 
             MaterialSwitchPreference notification = findPreference("enable_status_notification");
             if (notification != null) {
-                if (App.isParasitic() && !ShortcutUtil.isLaunchShortcutPinned()) {
+                if (App.isParasitic && !ShortcutUtil.isLaunchShortcutPinned()) {
                     var s = notification.getContext().getString(R.string.disable_status_notification_error);
                     notification.setSummaryOn(notification.getSummary() + "\n" + s);
-                    notification.setEnabled(false);
-                } else {
-                    notification.setEnabled(installed);
+                    if (ConfigManager.enableStatusNotification()) notification.setEnabled(false);
                 }
+                notification.setVisible(installed);
                 notification.setChecked(installed && ConfigManager.enableStatusNotification());
-                notification.setOnPreferenceChangeListener((p, v) ->
-                        ConfigManager.setEnableStatusNotification((boolean) v)
-                );
+                notification.setOnPreferenceChangeListener((p, v) -> {
+                    if ((boolean) v && App.isParasitic && !ShortcutUtil.isLaunchShortcutPinned()) {
+                        p.setEnabled(false);
+                    }
+                    return ConfigManager.setEnableStatusNotification((boolean) v);
+                });
             }
 
             Preference shortcut = findPreference("add_shortcut");
             if (shortcut != null) {
-                shortcut.setVisible(App.isParasitic() && ShortcutUtil.isRequestPinShortcutSupported(requireContext()));
+                shortcut.setVisible(App.isParasitic);
                 if (ShortcutUtil.isLaunchShortcutPinned()) {
                     shortcut.setEnabled(false);
                     shortcut.setSummary(R.string.settings_created_shortcut_summary);
@@ -184,7 +186,7 @@ public class SettingsFragment extends BaseFragment {
                     shortcut.setSummary(R.string.settings_create_shortcut_summary);
                 }
                 shortcut.setOnPreferenceClickListener(preference -> {
-                    ShortcutUtil.requestPinLaunchShortcut(() -> {
+                    if (!ShortcutUtil.requestPinLaunchShortcut(() -> {
                         shortcut.setEnabled(false);
                         shortcut.setSummary(R.string.settings_created_shortcut_summary);
                         if (notification != null) {
@@ -192,7 +194,9 @@ public class SettingsFragment extends BaseFragment {
                             notification.setSummaryOn(R.string.settings_enable_status_notification_summary);
                         }
                         App.getPreferences().edit().putBoolean("never_show_welcome", true).apply();
-                    });
+                    })) {
+                        parentFragment.showHint(R.string.settings_unsupported_pin_shortcut_summary, true);
+                    }
                     return true;
                 });
             }

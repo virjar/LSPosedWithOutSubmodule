@@ -22,10 +22,21 @@ import org.apache.tools.ant.filters.FixCrLfFilter
 import org.apache.tools.ant.filters.ReplaceTokens
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
-import java.util.*
+import java.util.Locale
+import com.android.build.api.instrumentation.AsmClassVisitorFactory
+import com.android.build.api.instrumentation.ClassContext
+import com.android.build.api.instrumentation.ClassData
+import com.android.build.api.instrumentation.InstrumentationParameters
+import com.android.build.api.instrumentation.InstrumentationScope
+import com.android.build.api.instrumentation.FramesComputationMode
+import org.objectweb.asm.ClassVisitor
+import org.objectweb.asm.MethodVisitor
+import org.objectweb.asm.Opcodes
 
+@Suppress("DSL_SCOPE_VIOLATION")
 plugins {
-    id("com.android.application")
+    alias(libs.plugins.agp.app)
+    alias(libs.plugins.lsplugin.resopt)
 }
 
 val moduleName = "LSPosed"
@@ -33,15 +44,14 @@ val moduleBaseId = "lsposed"
 val authors = "LSPosed Developers"
 
 val riruModuleId = "lsposed"
-val moduleMinRiruApiVersion = 25
-val moduleMinRiruVersionName = "25.0.1"
-val moduleMaxRiruApiVersion = 25
+val moduleMinRiruApiVersion = 26
+val moduleMinRiruVersionName = "26.1.7"
+val moduleMaxRiruApiVersion = 26
 
 val injectedPackageName: String by rootProject.extra
 val injectedPackageUid: Int by rootProject.extra
 
 val defaultManagerPackageName: String by rootProject.extra
-val apiCode: Int by rootProject.extra
 val verCode: Int by rootProject.extra
 val verName: String by rootProject.extra
 
@@ -56,7 +66,6 @@ android {
         applicationId = "org.lsposed.lspd"
         multiDexEnabled = false
 
-        buildConfigField("int", "API_CODE", "$apiCode")
         buildConfigField(
             "String",
             "DEFAULT_MANAGER_PACKAGE_NAME",
@@ -87,7 +96,6 @@ android {
                     arguments += "-DAPI=${name.toLowerCase()}"
                 }
             }
-            buildConfigField("String", "API", """"$name"""")
         }
 
         create("Riru") {
@@ -110,14 +118,18 @@ android {
     }
     namespace = "org.lsposed.lspd"
 }
+abstract class Injected @Inject constructor(val magiskDir: String) {
+    @get:Inject
+    abstract val factory: ObjectFactory
+}
 
 dependencies {
-    compileOnly("androidx.annotation:annotation:1.5.0")
-    compileOnly(projects.hiddenapi.stubs)
     implementation(projects.core)
     implementation(projects.hiddenapi.bridge)
     implementation(projects.services.managerService)
     implementation(projects.services.daemonService)
+    compileOnly(libs.androidx.annotation)
+    compileOnly(projects.hiddenapi.stubs)
 }
 
 val zipAll = task("zipAll") {
@@ -148,7 +160,7 @@ fun afterEval() = android.applicationVariants.forEach { variant ->
         into(magiskDir)
         from("${rootProject.projectDir}/README.md")
         from("$projectDir/magisk_module") {
-            exclude("riru.sh", "module.prop", "customize.sh", "sepolicy.rule", "daemon")
+            exclude("riru.sh", "module.prop", "customize.sh", "daemon")
         }
         from("$projectDir/magisk_module") {
             include("module.prop")
@@ -178,7 +190,7 @@ fun afterEval() = android.applicationVariants.forEach { variant ->
         }
         if (flavorLowered == "riru") {
             from("${projectDir}/magisk_module") {
-                include("riru.sh", "sepolicy.rule")
+                include("riru.sh")
                 val tokens = mapOf(
                     "RIRU_MODULE_LIB_NAME" to "lspd",
                     "RIRU_MODULE_API_VERSION" to moduleMaxRiruApiVersion.toString(),
@@ -214,14 +226,16 @@ fun afterEval() = android.applicationVariants.forEach { variant ->
             from(dexOutPath)
             rename("classes.dex", "lspd.dex")
         }
+
+        val injected = objects.newInstance<Injected>(magiskDir)
         doLast {
-            fileTree(magiskDir).visit {
+            injected.factory.fileTree().from(injected.magiskDir).visit {
                 if (isDirectory) return@visit
                 val md = MessageDigest.getInstance("SHA-256")
                 file.forEachBlock(4096) { bytes, size ->
                     md.update(bytes, 0, size)
                 }
-                file(file.path + ".sha256").writeText(Hex.encodeHexString(md.digest()))
+                File(file.path + ".sha256").writeText(Hex.encodeHexString(md.digest()))
             }
         }
     }
@@ -294,7 +308,7 @@ val reRunDaemon = task<Exec>("reRunDaemon") {
     dependsOn(pushDaemon, pushDaemonNative, killLspd)
     // tricky to pass a minus number to avoid the injection warning
     commandLine(
-        adb, "shell", "ASH_STANDALONE=1", "su", "-pc",
+        adb, "shell", "ASH_STANDALONE=1", "su", "-mm", "-pc",
         "/data/adb/magisk/busybox sh /data/adb/modules/*_lsposed/service.sh --system-server-max-retry=-1&"
     )
     isIgnoreExitValue = true

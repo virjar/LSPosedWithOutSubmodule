@@ -50,7 +50,7 @@
     <string name="activated">Activated</string>
     <string name="partial_activated">Partially activated</string>
     <string name="selinux_policy_not_loaded_summary">SEPolicy is not loaded properly</string>
-    <string name="selinux_policy_not_loaded"><![CDATA[Modules that hook System Framework will not work.<br/>Please report this to <a href="https://github.com/topjohnwu/Magisk/issues"><b>Magisk</b></a> developer.]]></string>
+    <string name="selinux_policy_not_loaded"><![CDATA[Some features will not work.<br/>Please report this to <a href="https://github.com/topjohnwu/Magisk/issues"><b>Magisk</b></a> developer.]]></string>
     <string name="system_inject_fail_summary">System Framework injection failed</string>
     <string name="system_inject_fail"><![CDATA[This is rare and may be caused by <b>Magisk</b> or some low-quality Magisk modules.<br/>Please try to disable Magisk modules other than Riru and LSPosed or submit full log to developers.]]></string>
     <string name="system_prop_incorrect_summary">System prop incorrect</string>
@@ -107,6 +107,7 @@
     <!-- ModulesActivity -->
     <string name="module_empty_description">(no description provided)</string>
     <string name="warning_xposed_min_version">This module requires a newer Xposed version (%d) and thus cannot be activated</string>
+    <string name="warning_target_version_higher">This module is designed for a newer Xposed version (%d) and thus some functionalities may not work</string>
     <string name="no_min_version_specified">This module does not specify the Xposed version it needs.</string>
     <string name="warning_min_version_too_low">This module was created for Xposed version %1$d, but due to incompatible changes in version %2$d, it has been disabled</string>
     <string name="warning_installed_on_external_storage">This module cannot be loaded because it\'s installed on the SD card, please move it to internal storage</string>
@@ -199,6 +200,7 @@
     <string name="settings_translation_summary">Help us translate %s into your language</string>
     <string name="settings_create_shortcut_summary">Create a shortcut that can open parasitic manager</string>
     <string name="settings_created_shortcut_summary">A shortcut has been created to open parasitic manager</string>
+    <string name="settings_unsupported_pin_shortcut_summary">The current default launcher does not support pin shortcuts</string>
     <string name="settings_enable_status_notification">Status Notification</string>
     <string name="settings_enable_status_notification_summary">Show a notification that can open parasitic manager</string>
     <string name="disable_status_notification_error">No shortcut, cannot disable notification</string>
@@ -207,7 +209,7 @@
     <string name="update_channel_bate">Beta</string>
     <string name="update_channel_nightly">Nightly build</string>
     <string name="settings_xposed_api_call_protection">Xposed API call protection</string>
-    <string name="settings_xposed_api_call_protection_summary">Block dynamically loaded module code to use Xposed API, this may break some modules but benefit security (experimental feature)</string>
+    <string name="settings_xposed_api_call_protection_summary">Block dynamically loaded module code to use Xposed API, this may break some modules but benefit security</string>
 
     <!-- Module Repo -->
     <string name="module_readme">Readme</string>

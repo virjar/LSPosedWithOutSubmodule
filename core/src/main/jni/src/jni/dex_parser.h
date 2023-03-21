@@ -14,22 +14,12 @@
  * You should have received a copy of the GNU General Public License
  * along with LSPosed.  If not, see <https://www.gnu.org/licenses/>.
  *
- * Copyright (C) 2022 LSPosed Contributors
+ * Copyright (C) 2023 LSPosed Contributors
  */
-
-//
-// Created by Nullptr on 2022/4/20.
-//
-
 #pragma once
 
-inline int32_t GetAndroidApiLevel() {
-    static int32_t api_level = []() {
-        char prop_value[PROP_VALUE_MAX];
-        __system_property_get("ro.build.version.sdk", prop_value);
-        int base = atoi(prop_value);
-        __system_property_get("ro.build.version.preview_sdk", prop_value);
-        return base + atoi(prop_value);
-    }();
-    return api_level;
+#include <jni.h>
+
+namespace lspd {
+    void RegisterDexParserBridge(JNIEnv *env);
 }

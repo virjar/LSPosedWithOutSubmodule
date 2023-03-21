@@ -20,11 +20,14 @@
 
 package org.lsposed.lspd.hooker;
 
+import android.app.ActivityThread;
 import android.app.LoadedApk;
 import android.content.res.XResources;
 import android.util.Log;
 
 import org.lsposed.lspd.util.Hookers;
+
+import java.util.Optional;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedHelpers;
@@ -34,7 +37,7 @@ import de.robv.android.xposed.XposedInit;
 public class LoadedApkCtorHooker extends XC_MethodHook {
 
     @Override
-    protected void afterHookedMethod(MethodHookParam param) {
+    protected void afterHookedMethod(MethodHookParam<?> param) {
         Hookers.logD("LoadedApk#<init> starts");
 
         try {
