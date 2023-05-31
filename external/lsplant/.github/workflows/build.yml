@@ -29,15 +29,6 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           cache: 'gradle'
-      - name: Cache Gradle Build
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.gradle/caches/build-cache-*
-            ~/.gradle/buildOutputCleanup/cache.properties
-          key: gradle-builds-core-${{ github.sha }}
-          restore-keys: |
-            gradle-builds-${{ runner.os }}
       - name: ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
@@ -143,6 +134,9 @@ jobs:
           - api-level: 33
             target: android-tv
             arch: x86
+          - api-level: UpsideDownCake-ext5
+            target: google_apis
+            arch: x86_64
     steps:
       - name: checkout
         uses: actions/checkout@v3
@@ -154,15 +148,6 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           cache: 'gradle'
-      - name: Cache Gradle Build
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.gradle/caches/build-cache-*
-            ~/.gradle/buildOutputCleanup/cache.properties
-          key: gradle-builds-core-${{ github.sha }}
-          restore-keys: |
-            gradle-builds-${{ runner.os }}
       - name: ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
@@ -170,7 +155,7 @@ jobs:
           restore-keys: ${{ runner.os }}
           save: false
       - name: run tests
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: yujincheng08/android-emulator-runner@release/apilevel
         with:
           api-level: ${{ matrix.api-level }}
           arch: ${{ matrix.arch }}
