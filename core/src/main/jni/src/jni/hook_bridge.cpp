@@ -29,9 +29,14 @@
 using namespace lsplant;
 
 namespace {
+struct ModuleCallback {
+    jmethodID before_method;
+    jmethodID after_method;
+};
 
 struct HookItem {
-    std::multimap<jint, jobject, std::greater<>> callbacks {};
+    std::multimap<jint, jobject, std::greater<>> legacy_callbacks;
+    std::multimap<jint, ModuleCallback, std::greater<>> modern_callbacks;
 private:
     std::atomic<jobject> backup {nullptr};
     static_assert(decltype(backup)::is_always_lock_free);
@@ -57,10 +62,13 @@ std::shared_mutex hooked_lock;
 absl::flat_hash_map<jmethodID, std::unique_ptr<HookItem>> hooked_methods;
 
 jmethodID invoke = nullptr;
+jmethodID callback_ctor = nullptr;
+jfieldID before_method_field = nullptr;
+jfieldID after_method_field = nullptr;
 }
 
 namespace lspd {
-LSP_DEF_NATIVE_METHOD(jboolean, HookBridge, hookMethod, jobject hookMethod,
+LSP_DEF_NATIVE_METHOD(jboolean, HookBridge, hookMethod, jboolean useModernApi, jobject hookMethod,
                       jclass hooker, jint priority, jobject callback) {
     bool newHook = false;
 #ifndef NDEBUG
@@ -108,11 +116,27 @@ LSP_DEF_NATIVE_METHOD(jboolean, HookBridge, hookMethod, jobject hookMethod,
     jobject backup = hook_item->GetBackup();
     if (!backup) return JNI_FALSE;
     JNIMonitor monitor(env, backup);
-    hook_item->callbacks.emplace(std::make_pair(priority, env->NewGlobalRef(callback)));
+    if (useModernApi) {
+        if (before_method_field == nullptr) {
+            auto callback_class = JNI_GetObjectClass(env, callback);
+            callback_ctor = JNI_GetMethodID(env, callback_class, "<init>", "(Ljava/lang/reflect/Method;Ljava/lang/reflect/Method;)V");
+            before_method_field = JNI_GetFieldID(env, callback_class, "beforeInvocation", "Ljava/lang/reflect/Method;");
+            after_method_field = JNI_GetFieldID(env, callback_class, "afterInvocation", "Ljava/lang/reflect/Method;");
+        }
+        auto before_method = JNI_GetObjectField(env, callback, before_method_field);
+        auto after_method = JNI_GetObjectField(env, callback, after_method_field);
+        auto callback_type = ModuleCallback {
+                .before_method = env->FromReflectedMethod(before_method),
+                .after_method = env->FromReflectedMethod(after_method),
+        };
+        hook_item->modern_callbacks.emplace(priority, callback_type);
+    } else {
+        hook_item->legacy_callbacks.emplace(priority, env->NewGlobalRef(callback));
+    }
     return JNI_TRUE;
 }
 
-LSP_DEF_NATIVE_METHOD(jboolean, HookBridge, unhookMethod, jobject hookMethod, jobject callback) {
+LSP_DEF_NATIVE_METHOD(jboolean, HookBridge, unhookMethod, jboolean useModernApi, jobject hookMethod, jobject callback) {
     auto target = env->FromReflectedMethod(hookMethod);
     HookItem * hook_item = nullptr;
     {
@@ -125,10 +149,21 @@ LSP_DEF_NATIVE_METHOD(jboolean, HookBridge, unhookMethod, jobject hookMethod, jo
     jobject backup = hook_item->GetBackup();
     if (!backup) return JNI_FALSE;
     JNIMonitor monitor(env, backup);
-    for (auto i = hook_item->callbacks.begin(); i != hook_item->callbacks.end(); ++i) {
-        if (env->IsSameObject(i->second, callback)) {
-            hook_item->callbacks.erase(i);
-            return JNI_TRUE;
+    if (useModernApi) {
+        auto before_method = JNI_GetObjectField(env, callback, before_method_field);
+        auto before = env->FromReflectedMethod(before_method);
+        for (auto i = hook_item->modern_callbacks.begin(); i != hook_item->modern_callbacks.end(); ++i) {
+            if (before == i->second.before_method) {
+                hook_item->modern_callbacks.erase(i);
+                return JNI_TRUE;
+            }
+        }
+    } else {
+        for (auto i = hook_item->legacy_callbacks.begin(); i != hook_item->legacy_callbacks.end(); ++i) {
+            if (env->IsSameObject(i->second, callback)) {
+                hook_item->legacy_callbacks.erase(i);
+                return JNI_TRUE;
+            }
         }
     }
     return JNI_FALSE;
@@ -153,7 +188,7 @@ LSP_DEF_NATIVE_METHOD(jobject, HookBridge, invokeOriginalMethod, jobject hookMet
 }
 
 LSP_DEF_NATIVE_METHOD(jobject, HookBridge, allocateObject, jclass cls) {
-    return env->AllocObject(clazz);
+    return env->AllocObject(cls);
 }
 
 LSP_DEF_NATIVE_METHOD(jobject, HookBridge, invokeSpecialMethod, jobject method, jcharArray shorty,
@@ -269,7 +304,7 @@ LSP_DEF_NATIVE_METHOD(jboolean, HookBridge, setTrusted, jobject cookie) {
     return lsplant::MakeDexFileTrusted(env, cookie);
 }
 
-LSP_DEF_NATIVE_METHOD(jobjectArray, HookBridge, callbackSnapshot, jobject method) {
+LSP_DEF_NATIVE_METHOD(jobjectArray, HookBridge, callbackSnapshot, jclass callback_class, jobject method) {
     auto target = env->FromReflectedMethod(method);
     HookItem *hook_item = nullptr;
     {
@@ -282,23 +317,34 @@ LSP_DEF_NATIVE_METHOD(jobjectArray, HookBridge, callbackSnapshot, jobject method
     jobject backup = hook_item->GetBackup();
     if (!backup) return nullptr;
     JNIMonitor monitor(env, backup);
-    auto res = env->NewObjectArray((jsize) hook_item->callbacks.size(), env->FindClass("java/lang/Object"), nullptr);
-    for (jsize i = 0; auto callback: hook_item->callbacks) {
-        env->SetObjectArrayElement(res, i++, env->NewLocalRef(callback.second));
+
+    auto res = env->NewObjectArray(2, env->FindClass("[Ljava/lang/Object;"), nullptr);
+    auto modern = env->NewObjectArray((jsize) hook_item->modern_callbacks.size(), env->FindClass("java/lang/Object"), nullptr);
+    auto legacy = env->NewObjectArray((jsize) hook_item->legacy_callbacks.size(), env->FindClass("java/lang/Object"), nullptr);
+    for (jsize i = 0; auto callback: hook_item->modern_callbacks) {
+        auto before_method = JNI_ToReflectedMethod(env, clazz, callback.second.before_method, JNI_TRUE);
+        auto after_method = JNI_ToReflectedMethod(env, clazz, callback.second.after_method, JNI_TRUE);
+        auto callback_object = JNI_NewObject(env, callback_class, callback_ctor, before_method, after_method);
+        env->SetObjectArrayElement(modern, i++, env->NewLocalRef(callback_object));
     }
+    for (jsize i = 0; auto callback: hook_item->legacy_callbacks) {
+        env->SetObjectArrayElement(legacy, i++, env->NewLocalRef(callback.second));
+    }
+    env->SetObjectArrayElement(res, 0, modern);
+    env->SetObjectArrayElement(res, 1, legacy);
     return res;
 }
 
 static JNINativeMethod gMethods[] = {
-    LSP_NATIVE_METHOD(HookBridge, hookMethod, "(Ljava/lang/reflect/Executable;Ljava/lang/Class;ILjava/lang/Object;)Z"),
-    LSP_NATIVE_METHOD(HookBridge, unhookMethod, "(Ljava/lang/reflect/Executable;Ljava/lang/Object;)Z"),
+    LSP_NATIVE_METHOD(HookBridge, hookMethod, "(ZLjava/lang/reflect/Executable;Ljava/lang/Class;ILjava/lang/Object;)Z"),
+    LSP_NATIVE_METHOD(HookBridge, unhookMethod, "(ZLjava/lang/reflect/Executable;Ljava/lang/Object;)Z"),
     LSP_NATIVE_METHOD(HookBridge, deoptimizeMethod, "(Ljava/lang/reflect/Executable;)Z"),
     LSP_NATIVE_METHOD(HookBridge, invokeOriginalMethod, "(Ljava/lang/reflect/Executable;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;"),
     LSP_NATIVE_METHOD(HookBridge, invokeSpecialMethod, "(Ljava/lang/reflect/Executable;[CLjava/lang/Class;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;"),
     LSP_NATIVE_METHOD(HookBridge, allocateObject, "(Ljava/lang/Class;)Ljava/lang/Object;"),
     LSP_NATIVE_METHOD(HookBridge, instanceOf, "(Ljava/lang/Object;Ljava/lang/Class;)Z"),
     LSP_NATIVE_METHOD(HookBridge, setTrusted, "(Ljava/lang/Object;)Z"),
-    LSP_NATIVE_METHOD(HookBridge, callbackSnapshot, "(Ljava/lang/reflect/Executable;)[Ljava/lang/Object;"),
+    LSP_NATIVE_METHOD(HookBridge, callbackSnapshot, "(Ljava/lang/Class;Ljava/lang/reflect/Executable;)[[Ljava/lang/Object;"),
 };
 
 void RegisterHookBridge(JNIEnv *env) {
