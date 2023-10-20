@@ -259,7 +259,7 @@ fun afterEval() = android.applicationVariants.forEach { variant ->
     task<Exec>("flashMagiskAndReboot${variantCapped}") {
         group = "LSPosed"
         dependsOn(flashMagiskTask)
-        commandLine(adb, "shell", "/system/bin/svc", "power", "reboot")
+        commandLine(adb, "shell", "su", "-c", "/system/bin/svc", "power", "reboot")
     }
     val flashKsuTask = task<Exec>("flashKsu${variantCapped}") {
         group = "LSPosed"
@@ -272,7 +272,7 @@ fun afterEval() = android.applicationVariants.forEach { variant ->
     task<Exec>("flashKsuAndReboot${variantCapped}") {
         group = "LSPosed"
         dependsOn(flashKsuTask)
-        commandLine(adb, "shell", "/system/bin/svc", "power", "reboot")
+        commandLine(adb, "shell", "su", "-c", "/system/bin/svc", "power", "reboot")
     }
 }
 
@@ -317,10 +317,15 @@ val reRunDaemon = task<Exec>("reRunDaemon") {
     )
     isIgnoreExitValue = true
 }
-val tmpApk = "/data/local/tmp/lsp.apk"
+val tmpApk = "/data/local/tmp/manager.apk"
 val pushApk = task<Exec>("pushApk") {
     group = "LSPosed"
     dependsOn(":app:assembleDebug")
+    doFirst {
+        exec {
+            commandLine(adb, "shell", "su", "-c", "rm", "-f", tmpApk)
+        }
+    }
     workingDir(project(":app").layout.buildDirectory.dir("outputs/apk/debug"))
     commandLine(adb, "push", "app-debug.apk", tmpApk)
 }
@@ -332,11 +337,9 @@ val openApp = task<Exec>("openApp") {
         "com.android.shell/.BugreportWarningActivity"
     )
 }
-task<Exec>("reRunApp") {
+task("reRunApp") {
     group = "LSPosed"
     dependsOn(pushApk)
-    commandLine(adb, "shell", "su", "-c", "mv -f $tmpApk /data/adb/lspd/manager.apk")
-    isIgnoreExitValue = true
     finalizedBy(reRunDaemon)
 }
 
